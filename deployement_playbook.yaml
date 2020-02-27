@@ -1,0 +1,80 @@
+- hosts: IP_OF_THE_NEW_SERVER
+  become: yes
+  become_method: sudo
+
+  vars:
+    temp:
+  
+  tasks:
+  - name: Update cache and package
+    yum: name=* state=latest
+
+  - name: Install packages to use repositories over https
+    yum:
+      name: "{{ packages }}"
+    vars:
+      packages:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+
+  - name: Add Docker repository
+    yum_repository:
+      name: docker
+      description: "Docker base repository"
+      baseurl: https://download.docker.com/linux/centos/docker-ce.repo
+
+  - name: Make Docker directory
+    shell: "mkdir /etc/docker"
+
+  - name: Copy daemon file
+    copy: 
+      src: /data/ansible/template_docker_daemon.json
+      dest: /etc/docker/daemon.json
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: Create docker.service.d directory
+    shell: "mkdir -p /etc/systemd/system/docker.service.d"
+
+  - name: Reload systemd
+    systemd:
+      daemon_reload: yes
+  
+  - name: Restart Docker service
+    systemd:
+      enable: yes
+      name: docker
+      state: restarted
+
+  - name: Add K8S repo
+    yum_repository:
+      name: Kubernetes
+      description: "Kubernetes base repository"
+      baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+      gpgcheck: yes
+      repo_gpgcheck: yes
+      gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+  - name: Set SELinux to permisive mode part 1
+    shell: "setenforce 0"
+
+  - name: Set SELinux to permisive mode part 1
+    shell: "sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config"
+
+  - name: Install K8S
+    yum:
+      name: "{{ packages }}"
+    disable_excludes: kubernetes
+    vars:
+      packages:
+      - kubelet
+      - kubeadm
+      - kubectl
+
+  - name: Enable kubelet service
+    systemd:
+      enable: yes
+      name: kubelet
+      state: restarted
