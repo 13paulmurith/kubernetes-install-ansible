@@ -1,9 +1,6 @@
 - hosts: IP_OF_THE_NEW_SERVER
   become: yes
   become_method: sudo
-
-  vars:
-    temp:
   
   tasks:
   - name: Update cache and package
